@@ -41,12 +41,11 @@ class FlightPath:
     self.l_lancher = l_lancher
     
     self.pos_ECEF_init = coord.LLH2ECEF(self.pos_LLH_init)
-    self.quat_init = coord.euler2quat(self.azimuth_init, self.elevation_init, self.roll_init)
-    self.quat_init = coord.quat_normalize(self.quat_init)
+    self.quat_init = coord.euler2quat(np.degrees(self.azimuth_init), np.degrees(self.elevation_init), np.degrees(self.roll_init))
 
   def seek_liftoff(self, acc_axis_log):
-    liftoff_acc = 2.0 # [G] わりとてきとうでよい
-    index_liftoff = (acc_axis_log > liftoff_acc).argmax() - self.freq
+    liftoff_acc = -100000.5# * 9.80665 # [m/s^2] わりとてきとうでよい
+    index_liftoff = (acc_axis_log > liftoff_acc).argmax()# - self.freq
     return index_liftoff
     
   def parse_flight(self, Tair, Pair, acc_x, acc_y, acc_z, gyro_x, gyro_y, gyro_z):
@@ -54,13 +53,9 @@ class FlightPath:
     self.Tair_log = Tair[index_liftoff:]
     self.Pair_log = Pair[index_liftoff:]
     self.acc_body_log = acc_x[index_liftoff:]
-    # self.acc_body_log = np.hstack((self.acc_body_log, acc_y[index_liftoff:]))
-    # self.acc_body_log = np.hstack((self.acc_body_log, acc_z[index_liftoff:]))
     self.acc_body_log = np.c_[self.acc_body_log, acc_y[index_liftoff:]]
     self.acc_body_log = np.c_[self.acc_body_log, acc_z[index_liftoff:]]
     self.gyro_body_log = gyro_x[index_liftoff:]
-    # self.gyro_body_log = np.hstack((self.gyro_body_log, gyro_y[index_liftoff:]))
-    # self.gyro_body_log = np.hstack((self.gyro_body_log, gyro_z[index_liftoff:]))
     self.gyro_body_log = np.c_[self.gyro_body_log, gyro_y[index_liftoff:]]
     self.gyro_body_log = np.c_[self.gyro_body_log, gyro_z[index_liftoff:]]
 
@@ -115,7 +110,7 @@ class FlightPath:
       self.attitude_rad_log[i, :] = coord.quat2euler(DCM_NED2body)      
 
       g0 = 9.80665
-      g = np.array([0.0, 0.0, -env.gravity(altitude)])
+      g = np.array([0.0, 0.0, env.gravity(altitude)])
       Tair, Pair, rho, Cs = env.std_atmo(altitude)
       
       # transration
@@ -130,13 +125,39 @@ class FlightPath:
 
       # rotation
       self.dquat_log[i, :] = kinematic_equation(self.quat_log[i-1, :], self.gyro_body_log[i, :])
-      self.quat_log[i, :] = self.quat_log[i, :] + delta(i, self.dquat_log[i, :], self.dquat_log[i-1, :], self.dt)
+      # self.quat_log[i, :] = self.quat_log[i-1, :] + delta(i, self.dquat_log[i, :], self.dquat_log[i-1, :], self.dt)
+      self.quat_log[i, :] = self.quat_log[i-1, :] + self.dquat_log[i, :] * self.dt
+      self.quat_log[i, :] = coord.quat_normalize(self.quat_log[i, :])
 
       # Liftoff = 0.0 sec
+      # self.index_liftoff
+      # index_liftoff = (acc_axis_log > liftoff_acc).argmax() - self.freq
+      
 
   
   def plot(self):
     plt.figure(0)
+    plt.plot(self.pos_NED_log[:, 0], label='North')
+    plt.plot(self.pos_NED_log[:, 1], label='East')
+    plt.plot(self.pos_NED_log[:, 2], label='Down')
+    plt.grid()
+    plt.legend()
+
+    plt.figure(1)
+    plt.plot(np.degrees(self.attitude_rad_log[:, 0]), label='azimuth')
+    plt.plot(np.degrees(self.attitude_rad_log[:, 1]), label='elevation')
+    plt.plot(np.degrees(self.attitude_rad_log[:, 2]), label='roll')
+    plt.grid()
+    plt.legend()
+
+    plt.figure(2)
+    plt.plot(self.gyro_body_log[:, 0], label='roll')
+    plt.plot(self.gyro_body_log[:, 1], label='pitch')
+    plt.plot(self.gyro_body_log[:, 2], label='yaw')
+    plt.grid()
+    plt.legend()
+
+    plt.show()
     
     
 
