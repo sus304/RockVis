@@ -38,11 +38,13 @@ def std_atmo(Altitude):
   
   return Temperature, Pressure, Density, SoundSpeed
 
-def gravity(Altitude):
+def gravity(altitude):
   # Altitude [m]
+  if altitude < 0.0:
+    altitude = 0.0
   Re = 6378.137e3 # Earth Radius [m]
   g0 = 9.80665
-  gravity = g0 * (Re / (Re + Altitude)) ** 2 # [m/s^2]
+  gravity = g0 * (Re / (Re + altitude)) ** 2 # [m/s^2]
   return gravity
 
 def wind_NED(WindSpeed, WindDirection, Altitude, refAltitude, power_exp):
