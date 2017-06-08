@@ -148,8 +148,8 @@ class FlightPath:
 
       # rotation
       self.dquat_log[i, :] = kinematic_equation(self.quat_log[i-1, :], self.gyro_body_log[i, :])
-      # self.quat_log[i, :] = self.quat_log[i-1, :] + delta(i, self.dquat_log[i, :], self.dquat_log[i-1, :], self.dt)
-      self.quat_log[i, :] = self.quat_log[i-1, :] + self.dquat_log[i, :] * self.dt
+      self.quat_log[i, :] = self.quat_log[i-1, :] + delta(self.dquat_log[i, :], self.dquat_log[i-1, :], self.dt)
+      # self.quat_log[i, :] = self.quat_log[i-1, :] + self.dquat_log[i, :] * self.dt
       self.quat_log[i, :] = coord.quat_normalize(self.quat_log[i, :])
 
       # Liftoff = 0.0 sec
