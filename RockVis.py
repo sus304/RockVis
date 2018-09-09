@@ -32,9 +32,12 @@ import simplekml
 
 
 class RocketVisualizer:
-    def __init__(self, sample_freq, g0):
+    def __init__(self, sample_freq, g0, diameter, result_name):
         self.freq = sample_freq
         self.g0 = g0
+        self.d = diameter
+        self.A = 0.25 * self.d ** 2 * np.pi  # [m2]
+        self.result_name = result_name
         self.R_air = 287.1
         self.gamma_air = 1.4
         self.temp_slope = 6.49  # [K/km] < 11 km alt
@@ -56,7 +59,7 @@ class RocketVisualizer:
         -Y:Launcher\n
         +Z:Altitude(Body Axis)\n
         -Z:Ground\n
-        Acc[G]/Gyro[rad/s]
+        Acc[G-Abs]/Gyro[rad/s]
         '''
         coordinate = Coordinate()
 
@@ -82,7 +85,7 @@ class RocketVisualizer:
         plt.ylabel('Acceleration Body [G]')
         plt.grid()
         plt.legend()
-        plt.savefig('result_Acc_body_G.png')
+        plt.savefig(self.result_name + '_Acc_body_G.png')
         plt.figure()
         plt.plot(time_log, acc_body_x_log, label='X:Body Axis')
         plt.plot(time_log, acc_body_y_log, label='Y:Body Side')
@@ -91,7 +94,7 @@ class RocketVisualizer:
         plt.ylabel('Acceleration Body [m/s2]')
         plt.grid()
         plt.legend()
-        plt.savefig('result_Acc_body.png')
+        plt.savefig(self.result_name + '_Acc_body.png')
         plt.figure()
         plt.plot(time_log, np.degrees(gyro_body_x_log), label='X:Roll')
         plt.plot(time_log, np.degrees(gyro_body_y_log), label='Y:Pitch(initial)')
@@ -100,17 +103,17 @@ class RocketVisualizer:
         plt.ylabel('Angler Velocity Body [deg/s]')
         plt.grid()
         plt.legend()
-        plt.savefig('result_Gyro_body.png')
+        plt.savefig(self.result_name + '_Gyro_body.png')
 
         self.time_log = time_log[self.index_liftoff:]
         self.acc_body_x_log = acc_body_x_log[self.index_liftoff:]
         self.acc_body_y_log = acc_body_y_log[self.index_liftoff:]
         self.acc_body_z_log = acc_body_z_log[self.index_liftoff:]
-        self.acc_body_log = pd.concat([self.acc_body_x_log, self.acc_body_y_log, self.acc_body_z_log], axis=1)
+        self.acc_body_log = np.c_[self.acc_body_x_log, self.acc_body_y_log, self.acc_body_z_log]
         self.gyro_body_x_log = gyro_body_x_log[self.index_liftoff:]
         self.gyro_body_y_log = gyro_body_y_log[self.index_liftoff:]
         self.gyro_body_z_log = gyro_body_z_log[self.index_liftoff:]
-        self.gyro_body_log = pd.concat([self.gyro_body_x_log, self.gyro_body_y_log, self.gyro_body_z_log], axis=1)
+        self.gyro_body_log = np.c_[self.gyro_body_x_log, self.gyro_body_y_log, self.gyro_body_z_log]
 
         gyro_x_polate = interpolate.interp1d(self.time_log, self.gyro_body_x_log, kind='linear', bounds_error=False, fill_value=(0.0, 0.0))
         gyro_y_polate = interpolate.interp1d(self.time_log, self.gyro_body_y_log, kind='linear', bounds_error=False, fill_value=(0.0, 0.0))
@@ -157,19 +160,19 @@ class RocketVisualizer:
         self.pos_ENU_z_log = cumtrapz(self.vel_ENU_z_log, self.time_log, initial=0.0)
         self.pos_ENU_log = np.c_[self.pos_ENU_x_log, self.pos_ENU_y_log, self.pos_ENU_z_log]
 
-        self.index_landing = int(80.0 * self.freq)
+        self.index_landing = int(20.0 * self.freq)
         # self.index_landing = len(self.pos_ENU_z_log)
 
         output_array = np.c_[self.time_log, self.acc_body_log, self.vel_body_log, self.acc_ENU_log, self.vel_ENU_log, self.pos_ENU_log, np.rad2deg(self.gyro_body_log), self.quat_log, self.attitude_log]
-        header = 'time[s]' ',acc_body_axis[m/s2],acc_body_side[m/s2],acc_body_upper[m/s2]' \
-                ',vel_body_axis[m/s],vel_body_side[m/s],vel_body_upper[m/s]'\
+        header = 'time[s]' ',acc_body_axial[m/s2],acc_body_side[m/s2],acc_body_upper[m/s2]' \
+                ',vel_body_axial[m/s],vel_body_side[m/s],vel_body_upper[m/s]'\
                 ',acc_ENU_East[m/s2],acc_ENU_North[m/s2],acc_ENU_Up[m/s2]'\
                 ',vel_ENU_East[m/s],vel_ENU_North[m/s],vel_ENU_Up[m/s]'\
                 ',pos_ENU_East[m],pos_ENU_North[m],pos_ENU_Up[m]'\
-                ',gyro_body_axis[deg/s],gyro_body_side[deg/s],gyro_body_upper[deg/s]'\
+                ',gyro_body_axial[deg/s],gyro_body_side[deg/s],gyro_body_upper[deg/s]'\
                 ',quatrnion1[-],quatrnion2[-],quatrnion3[-],quatrnion4[-]'\
                 ',roll[deg],elevation[deg],yaw[deg]'
-        np.savetxt('result_flight_log.csv', output_array, delimiter=',', fmt='%0.5f', header=header, comments='')
+        np.savetxt(self.result_name + '_flight_log.csv', output_array, delimiter=',', fmt='%0.5f', header=header, comments='')
 
         plt.figure()
         plt.plot(self.time_log[:self.index_landing], self.vel_body_x_log[:self.index_landing], label='X:Body Axis')
@@ -179,7 +182,7 @@ class RocketVisualizer:
         plt.ylabel('Velocity Body [m/s]')
         plt.grid()
         plt.legend()
-        plt.savefig('result_Vel_body.png')
+        plt.savefig(self.result_name + '_Vel_body.png')
 
         plt.figure()
         plt.plot(self.time_log[:self.index_landing], self.quat_log[:self.index_landing, 0], label='p1')
@@ -190,7 +193,7 @@ class RocketVisualizer:
         plt.ylabel('Quatrnion [-]')
         plt.grid()
         plt.legend()
-        plt.savefig('result_Quatrnion.png')
+        plt.savefig(self.result_name + '_Quatrnion.png')
 
         plt.figure()
         plt.plot(self.time_log[:self.index_landing], self.attitude_log[:self.index_landing, 0], label='Azimuth')
@@ -200,7 +203,7 @@ class RocketVisualizer:
         plt.ylabel('Angle [deg]')
         plt.grid()
         plt.legend()
-        plt.savefig('result_Aittitude.png')
+        plt.savefig(self.result_name + '_Aittitude.png')
 
         plt.figure()
         plt.plot(self.time_log[:self.index_landing], self.acc_ENU_x_log[:self.index_landing], label='X:East')
@@ -210,7 +213,7 @@ class RocketVisualizer:
         plt.ylabel('Acceleration ENU [m/s2]')
         plt.grid()
         plt.legend()
-        plt.savefig('result_Acc_ENU.png')
+        plt.savefig(self.result_name + '_Acc_ENU.png')
 
         plt.figure()
         plt.plot(self.time_log[:self.index_landing], self.vel_ENU_x_log[:self.index_landing], label='X:East')
@@ -220,7 +223,7 @@ class RocketVisualizer:
         plt.ylabel('Velocity ENU [m/s]')
         plt.grid()
         plt.legend()
-        plt.savefig('result_Vel_ENU.png')
+        plt.savefig(self.result_name + '_Vel_ENU.png')
 
         plt.figure()
         plt.plot(self.time_log[:self.index_landing], self.pos_ENU_x_log[:self.index_landing], label='X:East')
@@ -230,7 +233,88 @@ class RocketVisualizer:
         plt.ylabel('Position ENU [m]')
         plt.grid()
         plt.legend()
-        plt.savefig('result_Pos_ENU.png')
+        plt.savefig(self.result_name + '_Pos_ENU.png')
+
+    def complementaly_fileter(self, acc_x, acc_y, acc_z, gyro_x, gyro_y, gyro_z, elv0, azi0, roll0):
+        '''
+        Input coordinate (strap down INS sensor)\n
+        +X:Side\n
+        +Y:Launch direction\n
+        -Y:Launcher\n
+        +Z:Altitude(Body Axis)\n
+        -Z:Ground\n
+        Acc[G-Abs]/Gyro[rad/s]
+        '''
+        coordinate = Coordinate()
+
+        self.acc_body_x_G_log = acc_z  # [G]
+        self.acc_body_y_G_log = -acc_x
+        self.acc_body_z_G_log = -acc_y 
+
+        acc_body_x_log = acc_z * self.g0  # [m/s2]
+        acc_body_y_log = -acc_x * self.g0
+        acc_body_z_log = -acc_y * self.g0
+        gyro_body_x_log = gyro_z - np.average(gyro_z[:int(self.freq)])  # [rad/s]
+        gyro_body_y_log = -gyro_x + np.average(gyro_x[:int(self.freq)])
+        gyro_body_z_log = -gyro_y + np.average(gyro_y[:int(self.freq)])
+
+        self.index_liftoff = self.search_liftoff(acc_body_x_log)
+        time_log = np.linspace(-self.index_liftoff / self.freq, (len(acc_body_x_log) - self.index_liftoff) / self.freq, len(acc_body_x_log))
+
+        self.time_log = time_log[self.index_liftoff:]
+        self.acc_body_x_log = acc_body_x_log[self.index_liftoff:]
+        self.acc_body_y_log = acc_body_y_log[self.index_liftoff:]
+        self.acc_body_z_log = acc_body_z_log[self.index_liftoff:]
+        self.acc_body_log = np.c_[self.acc_body_x_log, self.acc_body_y_log, self.acc_body_z_log]
+        self.gyro_body_x_log = gyro_body_x_log[self.index_liftoff:]
+        self.gyro_body_y_log = gyro_body_y_log[self.index_liftoff:]
+        self.gyro_body_z_log = gyro_body_z_log[self.index_liftoff:]
+        self.gyro_body_log = np.c_[self.gyro_body_x_log, self.gyro_body_y_log, self.gyro_body_z_log]
+
+        gyro_x_polate = interpolate.interp1d(self.time_log, self.gyro_body_x_log, kind='linear', bounds_error=False, fill_value=(0.0, 0.0))
+        gyro_y_polate = interpolate.interp1d(self.time_log, self.gyro_body_y_log, kind='linear', bounds_error=False, fill_value=(0.0, 0.0))
+        gyro_z_polate = interpolate.interp1d(self.time_log, self.gyro_body_z_log, kind='linear', bounds_error=False, fill_value=(0.0, 0.0))
+
+        def kinematic(quat, t):
+            p = gyro_x_polate(t)
+            q = gyro_y_polate(t)
+            r = gyro_z_polate(t)
+            # quat = coordinate.quat_normalize(quat)
+            tersor_0 = [0.0, r, -q, p]
+            tersor_1 = [-r, 0.0, p, q]
+            tersor_2 = [q, -p, 0.0, r]
+            tersor_3 = [-p, -q, -r, 0.0]
+            tersor = np.array([tersor_0, tersor_1, tersor_2, tersor_3])
+            quatdot = 0.5 * tersor.dot(quat)
+            return quatdot
+
+        quat_init = coordinate.euler2quat(azi0, elv0, roll0)
+        self.quat_log = odeint(kinematic, quat_init, self.time_log)
+        DCM_ENU2Body_log = np.array(list(map(coordinate.DCM_ENU2Body_quat, self.quat_log)))
+        DCM_Body2ENU_log = np.array([DCM.transpose() for DCM in DCM_ENU2Body_log])
+        self.attitude_log = np.array([coordinate.quat2euler(DCM) for DCM in DCM_ENU2Body_log])  # [deg]
+
+        self.gravity_body_x_log = DCM_ENU2Body_log.dot([0.0, 0.0, self.g0])[:, 0]
+
+        self.vel_body_x_log = cumtrapz(self.acc_body_x_log, self.time_log, initial=0.0)
+        self.vel_body_y_log = cumtrapz(self.acc_body_y_log, self.time_log, initial=0.0)
+        self.vel_body_z_log = cumtrapz(self.acc_body_z_log, self.time_log, initial=0.0)
+        self.vel_body_log = np.c_[self.vel_body_x_log, self.vel_body_y_log, self.vel_body_z_log]
+
+        self.acc_ENU_log = np.array([DCM.dot(acc_body) for DCM, acc_body in zip(DCM_Body2ENU_log, np.array(self.acc_body_log))])
+        self.acc_ENU_x_log = self.acc_ENU_log[:, 0]
+        self.acc_ENU_y_log = self.acc_ENU_log[:, 1]
+        self.acc_ENU_z_log = self.acc_ENU_log[:, 2] - self.g0  # ToDo:重力加速度可変?
+
+        self.vel_ENU_x_log = cumtrapz(self.acc_ENU_x_log, self.time_log, initial=0.0)
+        self.vel_ENU_y_log = cumtrapz(self.acc_ENU_y_log, self.time_log, initial=0.0)
+        self.vel_ENU_z_log = cumtrapz(self.acc_ENU_z_log, self.time_log, initial=0.0)
+        self.vel_ENU_log = np.c_[self.vel_ENU_x_log, self.vel_ENU_y_log, self.vel_ENU_z_log]
+
+        self.pos_ENU_x_log = cumtrapz(self.vel_ENU_x_log, self.time_log, initial=0.0)
+        self.pos_ENU_y_log = cumtrapz(self.vel_ENU_y_log, self.time_log, initial=0.0)
+        self.pos_ENU_z_log = cumtrapz(self.vel_ENU_z_log, self.time_log, initial=0.0)
+        self.pos_ENU_log = np.c_[self.pos_ENU_x_log, self.pos_ENU_y_log, self.pos_ENU_z_log]
 
 
     def extend_flight_path_earth(self, launch_point_LLH):
@@ -247,7 +331,7 @@ class RocketVisualizer:
         plt.ylabel('Position ECEF [km]')
         plt.grid()
         plt.legend()
-        plt.savefig('result_Pos_ECEF.png')
+        plt.savefig(self.result_name + '_Pos_ECEF.png')
 
         kml = simplekml.Kml(open=1)
         Log_LLH = []
@@ -261,7 +345,7 @@ class RocketVisualizer:
         line.altitudemode = simplekml.AltitudeMode.absolute
         line.coords = Log_LLH
         line.style.linestyle.colormode = simplekml.ColorMode.random
-        kml.save('result_trajectory.kml')
+        kml.save(self.result_name + '_trajectory.kml')
 
 
     def extend_pressure_altitude_analysis(self, Pair_log, Pair_0, Tair_0):
@@ -277,10 +361,53 @@ class RocketVisualizer:
         plt.xlabel('Time [s]')
         plt.ylabel('Altitude [m]')
         plt.grid()
-        plt.savefig('result_PressureAlt.png')
+        plt.savefig(self.result_name + '_PressureAlt.png')
 
-        np.savetxt('result_PressureAlt_log.csv', np.c_[self.time_log, self.Pair_log, self.alt_pressure_log], delimiter=',', comments='', fmt='%0.5f', header='time[sec],air pressure[kPa],altitude[m]')
+        np.savetxt(self.result_name + '_PressureAlt_log.csv', np.c_[self.time_log, self.Pair_log, self.alt_pressure_log], delimiter=',', comments='', fmt='%0.5f', header='time[sec],air pressure[kPa],altitude[m]')
 
+    def extend_thrust_analysis(self, mass_log, mach_array_interpolate, Cd_array_interpolate, Tair_0):
+        self.Tair_log = (Tair_0 + 273.15) - self.pos_ENU_z_log * (self.temp_slope / 1e3)  # [K]
+        self.rho_log = self.Pair_log * 1e3 / (self.R_air * self.Tair_log)
+        self.Cs_log = np.sqrt(self.gamma_air * self.R_air * self.Tair_log)
+        self.mach_log = self.vel_body_x_log / self.Cs_log
+
+        Cd = interpolate.interp1d(mach_array_interpolate, Cd_array_interpolate, kind='linear', bounds_error=False, fill_value=(Cd_array_interpolate[0], Cd_array_interpolate[-1]))
+        self.Cd_log = Cd(self.mach_log)
+
+        self.drag_log = 0.5 * self.rho_log * self.vel_body_x_log ** 2 * self.Cd_log * self.A
+        self.mg_axial_log = mass_log * self.gravity_body_x_log
+        self.F_axial = self.acc_body_x_log * mass_log
+        self.thrust = self.F_axial + self.drag_log - self.mg_axial_log
+
+        output_array = np.c_[self.time_log, self.mach_log, self.Cd_log, self.drag_log, self.F_axial, self.thrust]
+        header = 'time[s],mach[-],Cd[-],drag[N],axial[N],thrust[N]'
+        np.savetxt(self.result_name + '_force_log.csv', output_array, delimiter=',', fmt='%0.5f', header=header, comments='')
+
+        plt.figure()
+        plt.plot(self.time_log[:self.index_landing], self.mach_log[:self.index_landing])
+        plt.xlabel('Time [s]')
+        plt.ylabel('Mach number [-]')
+        plt.grid()
+        plt.legend()
+        plt.savefig(self.result_name + '_Mach.png')
+
+        plt.figure()
+        plt.plot(self.time_log[:self.index_landing], self.drag_log[:self.index_landing], label='Drag')
+        plt.plot(self.time_log[:self.index_landing], self.thrust[:self.index_landing], label='Thrust')
+        plt.plot(self.time_log[:self.index_landing], self.F_axial[:self.index_landing], label='Axial')
+        plt.xlabel('Time [s]')
+        plt.ylabel('Force [N]')
+        plt.grid()
+        plt.legend()
+        plt.savefig(self.result_name + '_Force.png')
+
+        plt.figure()
+        plt.plot(self.time_log[:self.index_landing], self.thrust[:self.index_landing], label='Thrust')
+        plt.xlabel('Time [s]')
+        plt.ylabel('Thrust [N]')
+        plt.grid()
+        plt.legend()
+        plt.savefig(self.result_name + '_Thrust.png')
 
 class Coordinate:
     def DCM_ENU2Body_euler(self, azimuth, elevation, roll):
